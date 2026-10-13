@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Local LLM Lab</title>
+<style>
+:root{
+  --bg:220 13% 4.5%; --bg-sub:218 14% 6%; --bg-el:216 14% 7%;
+  --fg:214 20% 86%; --fg-m:214 12% 52%; --fg-t:216 30% 97%;
+  --card:220 13% 5.5%; --card-h:220 13% 7.5%; --card-a:220 13% 8.5%;
+  --border:216 14% 16%; --border-s:216 13% 11%;
+  --plat:215 21% 67%; --plat-dk:216 30% 8%; --ring:217 40% 60%;
+  --up:147 60% 65%; --dn:356 100% 68%; --warn:38 35% 60%;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;overflow:hidden;color:hsl(var(--fg));letter-spacing:-.011em;-webkit-font-smoothing:antialiased;
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',system-ui,sans-serif;
+  background:radial-gradient(140% 100% at 50% 0%, hsl(220 14% 6%) 0%, hsl(220 16% 3%) 55%, hsl(220 22% 1.5%) 100%);
+  background-attachment:fixed}
+::selection{background:hsl(217 38% 52% / .45);color:#fff}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:hsl(216 13% 16%);border-radius:8px}
+::-webkit-scrollbar-track{background:transparent}
+.shell{height:100vh;display:flex;flex-direction:column}
+
+/* ---------- topbar ---------- */
+.topbar{flex:none;display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:11px 20px 9px;border-bottom:1px solid hsl(var(--border-s))}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-mark{width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:12px;color:hsl(var(--plat-dk));
+  background:linear-gradient(160deg,hsl(var(--plat)) 0%,hsl(214 18% 40%) 100%);
+  box-shadow:inset 0 1px 0 hsl(221 40% 92% / .35)}
+.topstats{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+
+/* ---------- tabbar ---------- */
+.tabbar{flex:none;display:flex;gap:0;padding:0 20px;border-bottom:1px solid hsl(var(--border-s));align-items:stretch}
+.tab{appearance:none;background:none;border:0;border-bottom:2px solid transparent;cursor:pointer;
+  font:inherit;font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
+  color:hsl(var(--fg-m));padding:9px 16px 8px;transition:color .12s,border-color .12s}
+.tab:hover{color:hsl(var(--fg-t))}
+.tab.active{color:hsl(var(--plat));border-bottom-color:hsl(var(--plat))}
+.tab .cnt{font-size:9px;color:hsl(var(--fg-m));margin-left:5px;letter-spacing:0}
+
+/* ---------- pages ---------- */
+.content{flex:1;min-height:0;position:relative}
+.page{position:absolute;inset:0;display:none;flex-direction:column;padding:14px 20px 16px;gap:12px;overflow:hidden}
+.page.active{display:flex}
+.scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding-right:4px}
+
+/* ---------- type ---------- */
+.t-display{font-size:24px;line-height:1.2;font-weight:700;letter-spacing:-.02em}
+.t-h1{font-size:18px;line-height:1.3;font-weight:700;letter-spacing:-.01em}
+.t-h2{font-size:15px;line-height:1.35;font-weight:600;letter-spacing:-.005em}
+.t-h3{font-size:13px;line-height:1.45;font-weight:600}
+.t-body{font-size:12px;line-height:1.55;font-weight:400}
+.t-label{font-size:11px;line-height:1.5;font-weight:500}
+.t-micro{font-size:10px;line-height:1.5;font-weight:500;letter-spacing:.04em}
+.muted{color:hsl(var(--fg-m))}
+.title{color:hsl(var(--fg-t))}
+.mono,.num{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace}
+.num{font-variant-numeric:tabular-nums}
+.unit{font-size:11px;font-weight:500;color:hsl(var(--fg-m));margin-left:4px}
+.hot{color:hsl(var(--dn))}
+.warm{color:hsl(var(--warn))}
+
+/* ---------- flat panels: hairlines, not slabs ---------- */
+.panel{background:hsl(var(--card));border:1px solid hsl(var(--border-s));border-radius:6px}
+.panel-pad{padding:12px 14px}
+.split{display:flex;flex-direction:column;gap:12px;min-height:0}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.grow{flex:1;min-height:0}
+
+/* ---------- hero: flat strip, hairline dividers, no card fill ---------- */
+.hero{flex:none;display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;
+  border:1px solid hsl(var(--border-s));border-radius:6px;background:hsl(var(--card));overflow:hidden}
+.hero > div{padding:12px 16px;border-left:1px solid hsl(var(--border-s));min-width:0}
+.hero > div:first-child{border-left:0}
+.klabel{font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:hsl(var(--fg-m))}
+#spark{width:100%;height:74px;display:block;margin-top:8px}
+#spark-line{fill:none;stroke:hsl(var(--plat));stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}
+#spark-fill{fill:hsl(var(--plat) / .07)}
+.bar{height:5px;border-radius:999px;background:hsl(216 13% 13%);overflow:hidden;margin-top:10px}
+.bar i{display:block;height:100%;border-radius:999px;
+  background:linear-gradient(90deg,hsl(var(--plat) / .45),hsl(var(--plat)));transition:width .6s ease}
+.port-strip{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.port-chip{font-size:9px;padding:2px 7px;border-radius:999px;border:1px solid hsl(var(--border-s));color:hsl(var(--up))}
+
+/* ---------- pills / badges / buttons ---------- */
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;
+  border:1px solid hsl(var(--border-s));background:transparent;color:hsl(var(--fg-m));
+  font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.pill.up{color:hsl(var(--up));border-color:hsl(var(--up) / .3)}
+.pill.dn{color:hsl(var(--dn));border-color:hsl(var(--dn) / .3)}
+.pill.plat{color:hsl(var(--plat));border-color:hsl(var(--plat) / .3)}
+.badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:3px;
+  font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.badge.stock{background:hsl(148 30% 30% / .22);color:hsl(148 45% 68%)}
+.badge.mod{background:hsl(215 21% 67% / .1);color:hsl(215 25% 80%)}
+.badge.prism{background:hsl(38 25% 30% / .28);color:hsl(38 40% 70%)}
+.badge.pp{background:hsl(215 21% 67% / .08);color:hsl(215 20% 72%)}
+.badge.tg{background:hsl(148 30% 30% / .22);color:hsl(148 45% 70%)}
+.btn{font:inherit;font-size:11px;font-weight:500;padding:6px 12px;border-radius:5px;cursor:pointer;
+  background:transparent;color:hsl(var(--fg));border:1px solid hsl(var(--border-s));transition:all .13s}
+.btn:hover{background:hsl(var(--card-h));border-color:hsl(var(--plat) / .35)}
+.btn.primary{background:hsl(var(--plat));color:hsl(var(--plat-dk));border-color:hsl(var(--plat));font-weight:600}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{color:hsl(var(--dn));border-color:hsl(var(--dn) / .3)}
+.btn.danger:hover{background:hsl(356 40% 18% / .35)}
+.btn:disabled{opacity:.35;cursor:default}
+.in{font:inherit;font-size:12px;color:hsl(var(--fg));background:transparent;
+  border:1px solid hsl(var(--border-s));border-radius:5px;padding:6px 10px}
+.in::placeholder{color:hsl(214 12% 40%)}
+.in:focus{outline:none;border-color:hsl(var(--ring));box-shadow:0 0 0 3px hsl(217 40% 60% / .12)}
+.ctlbar{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.ctlbar label{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:hsl(var(--fg-m))}
+
+/* ---------- fleet ---------- */
+.fleet-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:9px}
+.fleet-card{padding:11px 13px;display:flex;flex-direction:column;gap:7px;transition:border-color .13s}
+.fleet-card:hover{border-color:hsl(var(--border))}
+.fc-top{display:flex;align-items:center;gap:8px}
+.fc-ctl{display:flex;gap:6px;align-items:center;margin-top:auto;padding-top:2px}
+.dot{width:7px;height:7px;border-radius:999px;flex:none}
+.dot.on{background:hsl(var(--up));box-shadow:0 0 6px hsl(var(--up) / .55);animation:pulse 2.2s infinite}
+.dot.off{background:hsl(214 12% 26%)}
+@keyframes pulse{50%{opacity:.4}}
+
+/* ---------- chat ---------- */
+.chat-grid{display:grid;grid-template-columns:340px 1fr;gap:12px;flex:1;min-height:0}
+@media(max-width:900px){.chat-grid{grid-template-columns:1fr}}
+.chat-left{display:flex;flex-direction:column;gap:9px;min-height:0}
+#chatinput{flex:1;min-height:90px;resize:none;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
+#chatlog{display:flex;flex-direction:column;gap:9px;height:100%;overflow-y:auto;padding:11px 12px}
+.msg{max-width:88%;padding:9px 13px;border-radius:6px;font-size:12px;line-height:1.55;white-space:pre-wrap}
+.msg.user{align-self:flex-end;background:hsl(215 21% 67% / .1);border:1px solid hsl(var(--plat) / .2);color:hsl(var(--fg-t))}
+.msg.model{align-self:flex-start;background:hsl(220 13% 6.5%);border:1px solid hsl(var(--border-s))}
+.msg .meta{margin-top:7px;padding-top:5px;border-top:1px solid hsl(var(--border-s));
+  font-size:9px;letter-spacing:.03em;color:hsl(var(--fg-m));font-family:ui-monospace,Menlo,Consolas,monospace}
+
+/* ---------- tables ---------- */
+.tbl-wrap{flex:1;min-height:0;overflow:auto;border:1px solid hsl(var(--border-s));border-radius:6px;background:hsl(var(--card))}
+table{width:100%;border-collapse:separate;border-spacing:0}
+thead th{position:sticky;top:0;background:hsl(220 13% 6.5%);z-index:1}
+th{font-size:9px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:hsl(var(--fg-m));
+  text-align:left;padding:8px 10px;border-bottom:1px solid hsl(var(--border-s))}
+td{font-size:12px;padding:6px 10px;border-bottom:1px solid hsl(216 13% 8%)}
+tbody tr:hover td{background:hsl(var(--card-a))}
+td.num,th.num{text-align:right}
+b.best{color:hsl(var(--plat));font-weight:700}
+
+/* ---------- misc ---------- */
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:4px;font-size:11px;
+  border:1px solid hsl(var(--border-s));color:hsl(var(--fg-m));margin:2px 4px 2px 0}
+.chip.running b{color:hsl(var(--plat))}
+.chip.done b{color:hsl(var(--up))}
+.chip.error b{color:hsl(var(--dn))}
+.spin{width:9px;height:9px;border:2px solid hsl(var(--border-s));border-top-color:hsl(var(--plat));
+  border-radius:999px;display:inline-block;animation:rot .8s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+#feed{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:hsl(var(--fg-m));
+  display:flex;flex-direction:column;gap:1px}
+.sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+input[type=checkbox]{accent-color:hsl(var(--plat));}
+.nbar{display:inline-block;width:44px;height:4px;border-radius:2px;background:hsl(216 13% 13%);
+  overflow:hidden;vertical-align:middle}
+.nbar i{display:block;height:100%;background:linear-gradient(90deg,hsl(var(--plat) / .45),hsl(var(--plat)))}
+.footer{flex:none;padding:7px 20px;border-top:1px solid hsl(var(--border-s));display:flex;
+  justify-content:space-between;gap:10px;color:hsl(var(--fg-m));font-size:9px;letter-spacing:.07em;text-transform:uppercase}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark mono">LL</div>
+    <div>
+      <div class="t-h3 title">Local LLM Lab</div>
+      <div class="t-micro muted">carbon-platinum &middot; rust-only &middot; all data real</div>
+    </div>
+  </div>
+  <div class="topstats">
+    <span class="pill plat">lab :7575</span>
+    <span class="pill" id="pill-lane">lane --</span>
+    <span class="pill" id="pill-fleet">fleet --</span>
+    <span class="pill" id="pill-mem">mem --</span>
+    <span class="pill" id="pill-clock">--:--:--</span>
+  </div>
+</header>
+
+<nav class="tabbar">
+  <button class="tab active" data-tab="overview">Overview</button>
+  <button class="tab" data-tab="fleet">Fleet<span class="cnt" id="cnt-fleet"></span></button>
+  <button class="tab" data-tab="chat">Chat</button>
+  <button class="tab" data-tab="bench">Bench</button>
+  <button class="tab" data-tab="rows">Rows</button>
+  <button class="tab" data-tab="taps">Taps</button>
+</nav>
+
+<div class="content">
+
+  <!-- ============ OVERVIEW ============ -->
+  <section class="page active" id="page-overview">
+    <div class="hero">
+      <div>
+        <div class="row" style="justify-content:space-between">
+          <span class="klabel">CPU &middot; PDH real-time</span>
+          <span class="t-micro muted" id="cpu-raw">now --</span>
+        </div>
+        <div class="t-display num" id="cpu-now">--<span class="unit">%</span></div>
+        <svg id="spark" viewBox="0 0 240 74" preserveAspectRatio="none"><polygon id="spark-fill"></polygon><polyline id="spark-line"></polyline></svg>
+        <div class="t-micro muted">ewma 0.35 &middot; 90-sample window</div>
+      </div>
+      <div>
+        <div class="klabel">Memory &middot; kernel32</div>
+        <div class="t-display num" id="ram-now">--<span class="unit">GB free</span></div>
+        <div class="bar"><i id="ram-bar" style="width:0%"></i></div>
+        <div class="t-micro muted" id="ram-sub">used --% of -- GB</div>
+      </div>
+      <div>
+        <div class="klabel">Fleet</div>
+        <div class="t-display num" id="fleet-num">--<span class="unit">alive</span></div>
+        <div class="port-strip" id="fleet-ports"></div>
+        <div class="t-micro muted">one flip = same model, other engine</div>
+      </div>
+      <div>
+        <div class="klabel">GGUF doctor</div>
+        <div class="t-display num" id="doc-errs">--<span class="unit">err</span></div>
+        <div class="t-micro muted" id="doc-sub">-- warns / -- scanned</div>
+        <div class="t-micro muted" id="last-bench">no bench yet</div>
+      </div>
+    </div>
+
+    <div class="split grow">
+      <div class="sec-head">
+        <div class="t-h2 title">Best in class &mdash; latest row per model / engine</div>
+        <div class="t-micro muted">platinum = class best</div>
+      </div>
+      <div class="tbl-wrap"><table id="besttable"></table></div>
+    </div>
+
+    <div class="panel panel-pad">
+      <div class="klabel" style="margin-bottom:6px">Lab feed</div>
+      <div id="feed"></div>
+    </div>
+  </section>
+
+  <!-- ============ FLEET ============ -->
+  <section class="page" id="page-fleet">
+    <div class="sec-head">
+      <div>
+        <div class="t-h2 title">Fleet &mdash; engine control</div>
+        <div class="t-micro muted">granite-&gt;stock &middot; bonsai-&gt;prism pins enforced server-side &middot; spawns BelowNormal</div>
+      </div>
+      <div class="ctlbar">
+        <label>threads</label><input class="in num" id="globt" value="6" style="width:50px">
+        <label>ctx</label><input class="in num" id="globctx" value="8192" style="width:68px" title="lfm wants 24576">
+        <label title="spawn with DAAVFX_DSPARK_TAPS=1 (mod engine only)"><input type="checkbox" id="tapsflag"> taps</label>
+        <button class="btn" id="stopall">Stop all</button>
+      </div>
+    </div>
+    <div class="scroll"><div class="fleet-grid" id="fleet"></div></div>
+  </section>
+
+  <!-- ============ CHAT ============ -->
+  <section class="page" id="page-chat">
+    <div class="sec-head">
+      <div>
+        <div class="t-h2 title">Chat &mdash; the bench is the chat</div>
+        <div class="t-micro muted">humans and agents hit the same /api/chat &middot; every session lands in chat_sessions.ndjson</div>
+      </div>
+      <div class="ctlbar">
+        <select class="in" id="chatport"></select>
+        <label>max tok</label><input class="in num" id="maxtok" value="256" style="width:66px">
+        <label>seed</label><input class="in num" id="chatseed" value="42" style="width:66px">
+        <button class="btn primary" id="chatsend">Send</button>
+        <button class="btn" id="chatclear">Clear</button>
+      </div>
+    </div>
+    <div class="chat-grid">
+      <div class="panel chat-left">
+        <textarea class="in" id="chatinput" placeholder="ask any running model...&#10;ctrl+enter to send"></textarea>
+        <div class="t-micro muted">temperature 0 + fixed seed = deterministic. every reply is a row.</div>
+      </div>
+      <div class="panel" style="overflow:hidden;display:flex"><div id="chatlog"><div class="t-micro muted" style="padding:11px 12px">no sessions yet this view</div></div></div>
+    </div>
+  </section>
+
+  <!-- ============ BENCH ============ -->
+  <section class="page" id="page-bench">
+    <div class="sec-head">
+      <div>
+        <div class="t-h2 title">Bench &mdash; speed rows</div>
+        <div class="t-micro muted">llama-bench &middot; lane-gated (cpu&gt;55 or ram-short refuses) &middot; rows stamped gguf+exe fingerprints</div>
+      </div>
+      <div class="ctlbar">
+        <select class="in" id="benchmodel"></select>
+        <select class="in" id="benchengine"><option value="">registry default</option><option value="stock">stock</option><option value="mod">mod</option><option value="prism">prism</option></select>
+        <label>t</label><input class="in num" id="bencht" value="6" style="width:46px">
+        <label>pp</label><input class="in num" id="benchpp" value="512" style="width:54px">
+        <label>tg</label><input class="in num" id="benchtg" value="128" style="width:54px">
+        <label>r</label><input class="in num" id="benchr" value="3" style="width:38px">
+        <label title="bench with DAAVFX_DSPARK_TAPS=1 (mod engine only)"><input type="checkbox" id="benchtaps"> taps</label>
+        <button class="btn primary" id="benchbtn">Run bench</button>
+      </div>
+    </div>
+    <div class="panel panel-pad" id="benchstate"></div>
+    <div class="tbl-wrap"><table id="benchtable"></table></div>
+  </section>
+
+  <!-- ============ ROWS ============ -->
+  <section class="page" id="page-rows">
+    <div class="sec-head">
+      <div>
+        <div class="t-h2 title">Speed rows &mdash; latest 25</div>
+        <div class="t-micro muted">append-only store: results\speed_rows.ndjson</div>
+      </div>
+      <div class="t-micro muted" id="rows-count"></div>
+    </div>
+    <div class="tbl-wrap"><table id="rowstable"></table></div>
+  </section>
+
+  <!-- ============ TAPS ============ -->
+  <section class="page" id="page-taps">
+    <div class="sec-head">
+      <div>
+        <div class="t-h2 title">DSpark taps &mdash; fork observability</div>
+        <div class="t-micro muted">mod engine publishes hidden-state taps (layers 2/6/10/14/18, hidden 2048) to Local\daavfx_dspark_&lt;pid&gt; &middot; seq = full 5-tap sets captured</div>
+      </div>
+      <div class="t-micro muted">flip a model with <b class="mono">taps</b> checked on the Fleet tab</div>
+    </div>
+    <div class="tbl-wrap"><table id="tapstable"></table></div>
+  </section>
+
+</div>
+
+<footer class="footer">
+  <span>stores: results\chat_sessions.ndjson &middot; results\speed_rows.ndjson &middot; results\ppl_rows.ndjson</span>
+  <span>THE CHAT IS THE BENCH &middot; ctrl+1..6 tabs</span>
+</footer>
+
+</div>
+<script>
+const $ = id => document.getElementById(id);
+function escH(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+async function jget(u){try{const r=await fetch(u);return await r.json()}catch(e){return null}}
+async function jpost(u,b){try{const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});return await r.json()}catch(e){return{error:String(e)}}}
+
+let cpuHist=[], MODELS=[], SERVERS={}, selectKey='', feedItems=[], chatLog=[], chatBusy=false;
+const benchWatch=new Set();
+
+/* ---------- tabs ---------- */
+function showTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
+  document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+name));
+  if(location.hash.slice(1)!==name){history.replaceState(null,'','#'+name);}
+  if(name==='rows'||name==='overview')loadRows();
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>showTab(t.dataset.tab));
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key>='1'&&e.key<='6'){e.preventDefault();showTab(['overview','fleet','chat','bench','rows','taps'][+e.key-1]);}
+});
+if(location.hash.length>1)showTab(location.hash.slice(1));
+
+/* ---------- feed ---------- */
+function feed(msg){
+  const t=new Date().toLocaleTimeString();
+  feedItems.unshift('['+t+'] '+msg); feedItems=feedItems.slice(0,6);
+  $('feed').innerHTML=feedItems.map(s=>'<div>'+escH(s)+'</div>').join('');
+}
+
+/* ---------- metrics ---------- */
+function drawSpark(){
+  const w=240,h=74,n=cpuHist.length;
+  const pts=cpuHist.map((v,i)=>[(n>1?i/(n-1):0)*w,h-(Math.min(v,100)/100)*(h-4)-2]);
+  const str=pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+  $('spark-line').setAttribute('points',str);
+  $('spark-fill').setAttribute('points',(str||'0,0')+' '+w+','+h+' 0,'+h);
+}
+async function pollMetrics(){
+  const m=await jget('/api/metrics'); if(!m)return;
+  const cpu=m.cpu_pct, el=$('cpu-now');
+  el.innerHTML=cpu.toFixed(1)+'<span class="unit">%</span>';
+  el.className='t-display num'+(cpu>80?' hot':cpu>55?' warm':'');
+  $('cpu-raw').textContent='now '+cpu.toFixed(1)+'%';
+  cpuHist.push(cpu); if(cpuHist.length>90)cpuHist.shift(); drawSpark();
+  $('ram-now').innerHTML=m.ram_avail_gb.toFixed(1)+'<span class="unit">GB free</span>';
+  $('ram-bar').style.width=Math.round(m.ram_load_pct)+'%';
+  $('ram-sub').textContent='used '+m.ram_load_pct.toFixed(0)+'% of '+m.ram_total_gb.toFixed(1)+' GB';
+  $('pill-mem').textContent='mem '+m.ram_avail_gb.toFixed(1)+'G';
+  const lane=$('pill-lane');
+  lane.textContent='lane '+(cpu>55?'hot':'clear');
+  lane.className='pill '+(cpu>55?'dn':'up');
+}
+async function pollDoctor(){
+  const d=await jget('/api/doctor'); if(!d)return;
+  const e=$('doc-errs');
+  e.innerHTML=d.errs+'<span class="unit">err</span>';
+  e.className='t-display num'+(d.errs>0?' hot':'');
+  $('doc-sub').textContent=d.warns+' warns / '+d.scanned+' scanned';
+}
+
+/* ---------- fleet ---------- */
+function rebuildSelects(){
+  const key=MODELS.map(m=>m.model+':'+m.port+':'+((SERVERS[m.port]||{}).state||'x')).join(',');
+  if(key===selectKey)return; selectKey=key;
+  const sel=$('chatport'), prev=sel.value;
+  sel.innerHTML=MODELS.filter(m=>m.port>0).map(m=>{
+    const st=(SERVERS[m.port]||{}).state;
+    return '<option value="'+m.port+'">'+escH(m.model)+' :'+m.port+(st==='alive'?' (alive)':'')+'</option>';
+  }).join('');
+  let hasPrev=false; for(const o of sel.options) if(o.value===prev)hasPrev=true;
+  if(prev&&hasPrev)sel.value=prev;
+  else{const a=MODELS.find(m=>{const s=SERVERS[m.port];return m.port>0&&s&&s.state==='alive'});if(a)sel.value=String(a.port);}
+  const bm=$('benchmodel'), bmPrev=bm.value;
+  bm.innerHTML=MODELS.map(m=>'<option value="'+escH(m.model)+'">'+escH(m.model)+'</option>').join('');
+  if(bmPrev)bm.value=bmPrev;
+}
+function renderFleet(){
+  const g=$('fleet');
+  if(!MODELS.length){g.innerHTML='<div class="t-micro muted">registry.json not readable</div>';return;}
+  g.innerHTML=MODELS.map(m=>{
+    const live=m.port>0?SERVERS[m.port]:null;
+    const alive=!!(live&&live.state==='alive');
+    const eng=live?live.engine:(m.engine||'stock');
+    const opts=['stock','mod','prism'].map(e=>'<option value="'+e+'"'+(e===eng?' selected':'')+'>'+e+'</option>').join('');
+    const noPort=m.port<=0;
+    return '<div class="panel fleet-card">'
+      +'<div class="fc-top"><span class="dot '+(alive?'on':'off')+'"></span>'
+      +'<span class="t-h3 title mono">'+escH(m.model)+'</span>'
+      +'<span class="badge '+escH(eng)+'">'+escH(eng)+'</span>'
+      +(alive?'<span class="pill up" style="margin-left:auto">alive</span>':'')+'</div>'
+      +'<div class="t-micro muted mono">'+(noPort?'no port':':'+m.port)+' &middot; '+Number(m.size_gb).toFixed(2)+' GB &middot; '+escH(m.think||'-')+'</div>'
+      +'<div class="t-micro muted">'+escH(m.status||'')+(m.exists?'':' [gguf missing]')+'</div>'
+      +'<div class="fc-ctl"><select class="in engsel"'+(noPort?' disabled':'')+'>'+opts+'</select>'
+      +'<button class="btn" data-flip="'+escH(m.model)+'"'+(noPort?' disabled':'')+'>Flip</button>'
+      +'<button class="btn danger" data-stop="'+m.port+'"'+(noPort?' disabled':'')+'>Stop</button></div>'
+      +'</div>';
+  }).join('');
+}
+async function pollFleet(){
+  const pair=await Promise.all([jget('/api/models'),jget('/api/servers')]);
+  const models=pair[0], srv=pair[1];
+  if(!models||!srv)return;
+  MODELS=models; SERVERS={};
+  srv.forEach(s=>SERVERS[s.port]={state:s.state,engine:s.engine});
+  let alive=0; srv.forEach(s=>{if(s.state==='alive')alive++});
+  $('fleet-num').innerHTML=alive+'<span class="unit">/ '+srv.length+' alive</span>';
+  $('pill-fleet').textContent='fleet '+alive+'/'+srv.length;
+  $('cnt-fleet').textContent=alive?alive:'';
+  $('fleet-ports').innerHTML=srv.filter(s=>s.state==='alive')
+    .map(s=>'<span class="port-chip mono">'+escH(s.model)+' :'+s.port+'</span>').join('')
+    ||'<span class="t-micro muted">none alive</span>';
+  rebuildSelects(); renderFleet();
+}
+$('fleet').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b||b.disabled)return;
+  if(b.dataset.flip){
+    const model=b.dataset.flip;
+    const sel=b.closest('.fleet-card').querySelector('select.engsel');
+    const threads=+$('globt').value||6, ctx=+$('globctx').value||8192;
+    const taps=$('tapsflag').checked;
+    feed('flip '+model+' -> '+sel.value+' t'+threads+' ctx'+ctx+(taps?' +taps':'')+' ...');
+    b.disabled=true;
+    jpost('/api/engine/flip',{model:model,engine:sel.value,threads:threads,ctx:ctx,taps:taps}).then(r=>{
+      feed('flip '+model+': '+(r.error?('REFUSED '+r.error):('spawned pid '+r.pid+' on :'+r.port+(r.taps?' [taps on]':''))));
+      b.disabled=false;
+    });
+  }
+  if(b.dataset.stop){
+    const port=+b.dataset.stop;
+    feed('stop :'+port+' ...');
+    jpost('/api/engine/stop',{port:port}).then(r=>feed('stop :'+port+' -> '+(r.error||JSON.stringify(r.killed||r.stopped||'ok'))));
+  }
+});
+$('stopall').onclick=()=>{
+  const alive=Object.keys(SERVERS).filter(p=>SERVERS[p].state==='alive');
+  if(!alive.length){feed('stop all: nothing alive');return;}
+  feed('stop all: '+alive.join(', ')+' ...');
+  alive.forEach(p=>jpost('/api/engine/stop',{port:+p}));
+};
+
+/* ---------- chat ---------- */
+function renderChat(){
+  const el=$('chatlog');
+  if(!chatLog.length){el.innerHTML='<div class="t-micro muted" style="padding:11px 12px">no sessions yet this view</div>';return;}
+  el.innerHTML=chatLog.map(m=>{
+    if(m.who==='user')return '<div class="msg user">'+escH(m.text)+'</div>';
+    const r=m.meta||{};
+    const badge=r.reasoning_split?'<span class="badge prism" style="margin-left:6px">reasoning split</span>':'';
+    const meta=(r.wall_ms!==undefined)?('<div class="meta">wall '+r.wall_ms+'ms &middot; '+(r.completion_tokens||0)+' tok &middot; '
+      +(r.tps||0).toFixed(1)+' tok/s &middot; finish '+(r.finish||'-')+badge+'</div>'):'';
+    return '<div class="msg model">'+escH(m.text)+meta+'</div>';
+  }).join('');
+  el.scrollTop=el.scrollHeight;
+}
+function setChatBusy(b){chatBusy=b;$('chatsend').disabled=b;$('chatsend').textContent=b?'generating...':'Send'}
+function sendChat(){
+  if(chatBusy)return;
+  const prompt=$('chatinput').value.trim(); if(!prompt)return;
+  const port=+$('chatport').value, mt=+$('maxtok').value||256, seed=+$('chatseed').value||42;
+  if(!port){feed('chat: pick a port first');return;}
+  chatLog.push({who:'user',text:prompt}); renderChat();
+  $('chatinput').value=''; setChatBusy(true);
+  jpost('/api/chat',{port:port,actor:'human',prompt:prompt,max_tokens:mt,seed:seed}).then(res=>{
+    chatLog.push({who:'model',text:(res.reply&&res.reply.trim())?res.reply:(res.error||'(empty reply)'),meta:res});
+    renderChat(); setChatBusy(false); pollMetrics();
+  });
+}
+$('chatsend').onclick=sendChat;
+$('chatclear').onclick=()=>{chatLog=[];renderChat()};
+$('chatinput').addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter')sendChat()});
+
+/* ---------- bench + rows ---------- */
+function renderBenchChips(st){
+  if(!st||!st.length){$('benchstate').innerHTML='<span class="t-micro muted">idle &middot; no bench history this session</span>';return;}
+  $('benchstate').innerHTML=st.slice(-5).reverse().map(e=>{
+    const r=e.result||{}, state=r.state||'running';
+    const spin=(state==='running')?'<span class="spin"></span> ':'';
+    let info='';
+    if(state==='done')info=r.rows+' rows';
+    else if(state==='error')info=String(r.stderr_tail||r.spawn||'error').split('\n').pop().slice(0,90);
+    return '<span class="chip '+state+'">'+spin+escH(e.key)+' &middot; <b>'+state+'</b> '+escH(info)+'</span>';
+  }).join('');
+}
+function groupRows(rows){
+  const g={};
+  rows.forEach(r=>{
+    const k=r.model+'|'+r.engine+'|t'+r.threads;
+    if(!g[k])g[k]={};
+    if(!g[k][r.kind])g[k][r.kind]=r;
+  });
+  return g;
+}
+function kindOf(v,pfx){let out=null;Object.keys(v).forEach(k=>{if(k.indexOf(pfx)===0&&!out)out=v[k]});return out;}
+function renderBenchResults(rows){
+  const g=groupRows(rows);
+  const best={};
+  Object.keys(g).forEach(k=>{
+    const model=k.split('|')[0];
+    [['pp','pp512'],['tg','tg128']].forEach(pair=>{
+      const v=kindOf(g[k],pair[0]);
+      if(v&&(!best[model+'|'+pair[0]]||+v.avg_ts>+best[model+'|'+pair[0]]))best[model+'|'+pair[0]]=+v.avg_ts;
+    });
+  });
+  const keys=Object.keys(g).sort();
+  let html='<thead><tr><th>model</th><th>engine</th><th>t</th><th class="num">pp tok/s</th><th class="num">tg tok/s</th></tr></thead><tbody>';
+  if(!keys.length)html+='<tr><td colspan="5" class="t-micro muted">no rows yet &mdash; honest zero</td></tr>';
+  keys.forEach(k=>{
+    const parts=k.split('|'), model=parts[0], eng=parts[1], t=parts[2], v=g[k];
+    const pp=kindOf(v,'pp'), tg=kindOf(v,'tg');
+    const ppV=pp?pp.avg_ts:null, tgV=tg?tg.avg_ts:null;
+    const ppB=(ppV!==null&&+ppV===best[model+'|pp']), tgB=(tgV!==null&&+tgV===best[model+'|tg']);
+    html+='<tr><td class="mono title">'+escH(model)+'</td>'
+      +'<td><span class="badge '+escH(eng)+'">'+escH(eng)+'</span></td>'
+      +'<td class="mono">'+escH(t)+'</td>'
+      +'<td class="mono num">'+(ppV!==null?(ppB?'<b class="best">'+ppV+'</b>':ppV):'--')+'</td>'
+      +'<td class="mono num">'+(tgV!==null?(tgB?'<b class="best">'+tgV+'</b>':tgV):'--')+'</td></tr>';
+  });
+  $('benchtable').innerHTML=html+'</tbody>';
+  if(keys.length){
+    const last=rows[0];
+    $('last-bench').textContent='latest: '+last.model+' '+last.engine+' '+last.kind+' '+last.avg_ts+' tok/s';
+  }
+}
+function renderBest(rows){
+  const g=groupRows(rows);
+  const keys=Object.keys(g).sort();
+  let html='<thead><tr><th>model</th><th>engine</th><th>t</th><th class="num">pp</th><th class="num">tg</th><th>row</th></tr></thead><tbody>';
+  if(!keys.length)html+='<tr><td colspan="6" class="t-micro muted">no rows yet &mdash; honest zero</td></tr>';
+  keys.forEach(k=>{
+    const parts=k.split('|'), model=parts[0], eng=parts[1], t=parts[2], v=g[k];
+    const pp=kindOf(v,'pp'), tg=kindOf(v,'tg');
+    html+='<tr><td class="mono title">'+escH(model)+'</td>'
+      +'<td><span class="badge '+escH(eng)+'">'+escH(eng)+'</span></td>'
+      +'<td class="mono">'+escH(t)+'</td>'
+      +'<td class="mono num">'+(pp?pp.avg_ts:'--')+'</td>'
+      +'<td class="mono num">'+(tg?tg.avg_ts:'--')+'</td>'
+      +'<td><span class="pill up">'+escH(eng)+'</span>'+(rows.find(r=>r.model===model&&r.taps===true)?' <span class="badge prism">taps</span>':'')+'</td></tr>';
+  });
+  $('besttable').innerHTML=html+'</tbody>';
+}
+function renderRowsTable(rows){
+  $('rows-count').textContent=rows.length+' rows (newest first)';
+  let html='<thead><tr><th>when</th><th>model</th><th>engine</th><th>t</th><th>test</th><th class="num">tok/s</th><th>gguf fp</th><th>exe fp</th></tr></thead><tbody>';
+  if(!rows.length)html+='<tr><td colspan="8" class="t-micro muted">no rows yet</td></tr>';
+  rows.forEach(r=>{
+    const when=new Date(+r.ts*1000).toLocaleTimeString();
+    html+='<tr><td class="mono muted">'+when+'</td>'
+      +'<td class="mono">'+escH(r.model)+'</td>'
+      +'<td><span class="badge '+escH(r.engine)+'">'+escH(r.engine)+'</span></td>'
+      +'<td class="mono">'+r.threads+'</td>'
+      +'<td><span class="badge '+(r.kind&&r.kind.indexOf('pp')===0?'pp':'tg')+'">'+escH(r.kind)+'</span>'+(r.taps===true?' <span class="badge prism">taps</span>':'')+'</td>'
+      +'<td class="mono num">'+r.avg_ts+'</td>'
+      +'<td class="mono muted">'+String(r.gguf_fp).slice(0,6)+'</td>'
+      +'<td class="mono muted">'+String(r.exe_fp).slice(0,6)+'</td></tr>';
+  });
+  $('rowstable').innerHTML=html+'</tbody>';
+}
+async function loadRows(){
+  const rows=await jget('/api/rows?store=speed_rows'); if(!rows)return;
+  renderRowsTable(rows); renderBenchResults(rows); renderBest(rows);
+}
+async function pollBench(){
+  const st=await jget('/api/bench/state');
+  renderBenchChips(st);
+  if(!st)return;
+  let changed=false;
+  st.forEach(e=>{
+    const r=e.result||{};
+    if(benchWatch.has(e.key)&&(r.state==='done'||r.state==='error')){
+      benchWatch.delete(e.key); changed=true;
+      feed('bench '+(r.state==='done'?('done: '+e.key+' ('+r.rows+' rows)'):('ERROR: '+e.key+' - '+String(r.stderr_tail||'').split('\n').pop().slice(0,70))));
+    }
+  });
+  if(changed)loadRows();
+}
+$('benchbtn').onclick=()=>{
+  const body={model:$('benchmodel').value,threads:+$('bencht').value||6,
+    pp:+$('benchpp').value||512,tg:+$('benchtg').value||128,reps:+$('benchr').value||3};
+  const eng=$('benchengine').value; if(eng)body.engine=eng;
+  body.taps=$('benchtaps').checked;
+  jpost('/api/bench/run',body).then(res=>{
+    if(res.error){feed('bench REFUSED: '+res.error);return;}
+    benchWatch.add(res.key); feed('bench started: '+res.key+(body.taps?' +taps':''));
+  });
+};
+
+/* ---------- taps (fork observability) ---------- */
+async function pollTaps(){
+  const rows=await jget('/api/taps'); if(!rows)return;
+  let html='<thead><tr><th>model</th><th>port</th><th>engine</th><th>pid</th><th>bridge</th><th class="num">seq</th><th class="num">captures</th><th class="num">copied</th><th class="num">us/cap</th><th>tap norms (L2 per tap)</th></tr></thead><tbody>';
+  if(!rows.length)html+='<tr><td colspan="10" class="t-micro muted">no live servers &mdash; flip a model with taps checked on the Fleet tab</td></tr>';
+  rows.forEach(r=>{
+    const mb=r.shm&&r.bytes?(r.bytes/1048576).toFixed(2)+' MB':'--';
+    const us=r.shm&&r.captures?(r.total_ns/1000/r.captures).toFixed(1):'--';
+    let normhtml='--';
+    if(r.shm&&r.norms&&r.norms.length){
+      const mx=Math.max.apply(null,r.norms.concat([0.001]));
+      normhtml=r.norms.map((n,i)=>'<span class="t-micro mono muted" style="margin-right:3px">l'+r.taps[i]+'</span>'
+        +'<span class="nbar"><i style="width:'+Math.max(2,Math.round(n/mx*100))+'%"></i></span>'
+        +'<span class="t-micro mono" style="margin:0 9px 0 3px">'+n.toFixed(1)+'</span>').join('');
+    }
+    html+='<tr><td class="mono title">'+escH(r.model)+'</td><td class="mono">'+r.port+'</td>'
+      +'<td><span class="badge '+escH(r.engine)+'">'+escH(r.engine)+'</span></td>'
+      +'<td class="mono muted">'+r.pid+'</td>'
+      +'<td>'+(r.shm?(r.enabled?'<span class="badge tg">live</span>':'<span class="badge pp">idle</span>'):'<span class="t-micro muted">none</span>')+'</td>'
+      +'<td class="mono num">'+(r.shm?r.seq:'--')+'</td>'
+      +'<td class="mono num">'+(r.shm?r.captures:'--')+'</td>'
+      +'<td class="mono num">'+mb+'</td>'
+      +'<td class="mono num">'+us+'</td>'
+      +'<td>'+normhtml+'</td></tr>';
+  });
+  $('tapstable').innerHTML=html+'</tbody>';
+}
+
+/* ---------- clock + boot ---------- */
+function tick(){$('pill-clock').textContent=new Date().toLocaleTimeString()}
+tick(); pollMetrics(); pollDoctor(); pollFleet(); loadRows(); pollBench(); pollTaps();
+setInterval(tick,1000);
+setInterval(pollMetrics,2000);
+setInterval(pollDoctor,30000);
+setInterval(pollFleet,2500);
+setInterval(loadRows,15000);
+setInterval(pollBench,2500);
+setInterval(pollTaps,2500);
+</script>
+</body>
+</html>
